@@ -50,6 +50,10 @@ const RecorderPage = () => {
       createdAt: Date.now(),
     });
 
+    setTranscript("");
+    setInterimText("");
+    await clearDraft();
+
     const url = `${buildTwitterIntentUrl(text)}#uccharan-auto-post`;
 
     chrome.runtime.sendMessage(
@@ -68,8 +72,6 @@ const RecorderPage = () => {
           setError(response?.error ?? "Failed to open Twitter.");
           return;
         }
-
-        void clearDraft();
         window.close();
       },
     );

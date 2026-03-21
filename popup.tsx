@@ -41,6 +41,10 @@ const Popup = () => {
       createdAt: Date.now()
     })
 
+    setTranscript("")
+    setInterimText("")
+    await clearDraft()
+
     const url = `${buildTwitterIntentUrl(text)}#uccharan-auto-post`
 
     chrome.runtime.sendMessage({ type: "OPEN_TWITTER_INTENT", url }, (response) => {
