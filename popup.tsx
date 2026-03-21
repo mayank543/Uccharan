@@ -2,6 +2,7 @@ import "~/style.css"
 
 import { useEffect, useRef, useState } from "react"
 
+import { Toggle } from "~/components/toggle"
 import { clearDraft, loadAutoModeEnabled, loadDraft, saveAutoModeEnabled, saveDraft, savePendingPost } from "~/lib/storage"
 import { createSpeechController, isSpeechRecognitionSupported } from "~/lib/speech"
 import { buildTwitterIntentUrl, getTweetLength, isTweetTooLong, MAX_TWEET_LENGTH } from "~/lib/twitter"
@@ -13,11 +14,9 @@ const Popup = () => {
   const [error, setError] = useState("")
   const [isSupported, setIsSupported] = useState(true)
   const [autoModeEnabled, setAutoModeEnabled] = useState(false)
-  const [isInitialized, setIsInitialized] = useState(false)
   const speechControllerRef = useRef<ReturnType<typeof createSpeechController>>(null)
   const transcriptRef = useRef("")
   const livePreviewRef = useRef("")
-  const autoStartTriggeredRef = useRef(false)
   const autoPostOnStopRef = useRef(false)
 
   useEffect(() => {
@@ -91,7 +90,6 @@ const Popup = () => {
 
       if (!supported) {
         setError("Web Speech API is unavailable in this browser. Use Chrome for the best result.")
-        setIsInitialized(true)
         return
       }
 
@@ -120,8 +118,6 @@ const Popup = () => {
         },
         getSeedText: () => transcriptRef.current
       })
-
-      setIsInitialized(true)
     }
 
     void initialize()
@@ -142,18 +138,6 @@ const Popup = () => {
   useEffect(() => {
     livePreviewRef.current = livePreview
   }, [livePreview])
-
-  useEffect(() => {
-    if (!isInitialized || !isSupported || !autoModeEnabled || autoStartTriggeredRef.current || isListening) {
-      return
-    }
-
-    autoStartTriggeredRef.current = true
-    setTranscript("")
-    setInterimText("")
-    void clearDraft()
-    requestMicAndStart()
-  }, [autoModeEnabled, isInitialized, isListening, isSupported])
 
   const handleToggleListening = () => {
     if (isListening) {
@@ -180,8 +164,12 @@ const Popup = () => {
 
   const handleAutoModeChange = (enabled: boolean) => {
     setAutoModeEnabled(enabled)
-    autoStartTriggeredRef.current = false
     void saveAutoModeEnabled(enabled)
+    chrome.runtime.sendMessage({ type: "SET_AUTO_MODE", enabled }, () => {
+      if (chrome.runtime.lastError) {
+        setError(chrome.runtime.lastError.message ?? "Failed to update auto mode.")
+      }
+    })
   }
 
   const handlePostToX = async () => {
@@ -205,21 +193,9 @@ const Popup = () => {
         <label className="mb-4 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
           <div>
             <p className="text-sm font-semibold text-slate-800">Auto Mode</p>
-            <p className="text-xs text-slate-500">Start listening on open and auto-post when you stop.</p>
+            <p className="text-xs text-slate-500">Clicking the extension icon opens a compact recorder and posts on stop.</p>
           </div>
-          <button
-            aria-pressed={autoModeEnabled}
-            className={`relative h-7 w-12 rounded-full transition ${
-              autoModeEnabled ? "bg-brand" : "bg-slate-300"
-            }`}
-            onClick={() => handleAutoModeChange(!autoModeEnabled)}
-            type="button">
-            <span
-              className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
-                autoModeEnabled ? "left-6" : "left-1"
-              }`}
-            />
-          </button>
+          <Toggle ariaLabel="Toggle auto mode" checked={autoModeEnabled} onChange={handleAutoModeChange} />
         </label>
 
         <button
