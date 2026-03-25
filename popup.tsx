@@ -42,7 +42,10 @@ const Popup = () => {
     })
 
     setTranscript("")
+    transcriptRef.current = ""
     setInterimText("")
+    livePreviewRef.current = ""
+    speechControllerRef.current?.reset()
     await clearDraft()
 
     const url = `${buildTwitterIntentUrl(text)}#uccharan-auto-post`
@@ -154,15 +157,20 @@ const Popup = () => {
   }
 
   const handleTranscriptChange = (value: string) => {
+    transcriptRef.current = value
     setTranscript(value)
     setInterimText("")
+    speechControllerRef.current?.reset(value)
   }
 
   const handleClear = async () => {
+    transcriptRef.current = ""
+    livePreviewRef.current = ""
     setTranscript("")
     setInterimText("")
     setError("")
     autoPostOnStopRef.current = false
+    speechControllerRef.current?.reset()
     await clearDraft()
   }
 

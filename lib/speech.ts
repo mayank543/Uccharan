@@ -25,34 +25,30 @@ declare global {
     abort: () => void
     onstart: (() => void) | null
     onend: (() => void) | null
-    onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
+    onerror: ((event: Event & { readonly error: string }) => void) | null
     onresult: ((event: SpeechRecognitionEvent) => void) | null
   }
 
-  interface SpeechRecognitionErrorEvent extends Event {
-    error: string
-  }
-
   interface SpeechRecognitionAlternative {
-    transcript: string
+    readonly transcript: string
   }
 
   interface SpeechRecognitionResult {
-    isFinal: boolean
-    length: number
+    readonly isFinal: boolean
+    readonly length: number
     item: (index: number) => SpeechRecognitionAlternative
     [index: number]: SpeechRecognitionAlternative
   }
 
   interface SpeechRecognitionResultList {
-    length: number
+    readonly length: number
     item: (index: number) => SpeechRecognitionResult
     [index: number]: SpeechRecognitionResult
   }
 
   interface SpeechRecognitionEvent extends Event {
-    resultIndex: number
-    results: SpeechRecognitionResultList
+    readonly resultIndex: number
+    readonly results: SpeechRecognitionResultList
   }
 }
 
@@ -123,6 +119,9 @@ export const createSpeechController = (callbacks: SpeechCallbacks, language = "e
   return {
     start: () => recognition.start(),
     stop: () => recognition.stop(),
-    abort: () => recognition.abort()
+    abort: () => recognition.abort(),
+    reset: (seedText = "") => {
+      finalText = seedText.trim()
+    }
   }
 }

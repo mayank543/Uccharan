@@ -51,7 +51,9 @@ const RecorderPage = () => {
     });
 
     setTranscript("");
+    transcriptRef.current = "";
     setInterimText("");
+    speechControllerRef.current?.reset();
     await clearDraft();
 
     const url = `${buildTwitterIntentUrl(text)}#uccharan-auto-post`;
@@ -84,8 +86,10 @@ const RecorderPage = () => {
     }
 
     setError("");
+    transcriptRef.current = "";
     setTranscript("");
     setInterimText("");
+    speechControllerRef.current?.reset();
     void clearDraft();
 
     if (!navigator.mediaDevices?.getUserMedia) {

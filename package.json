@@ -1,9 +1,11 @@
 {
   "name": "uccharan-extension",
+  "displayName": "Uccharan",
   "version": "0.1.0",
   "private": true,
   "description": "Voice-to-tweet Chrome extension built with Plasmo, React, and Tailwind.",
   "manifest": {
+    "name": "Uccharan",
     "permissions": [
       "storage",
       "tabs"
