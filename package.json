@@ -11,16 +11,20 @@
       "tabs"
     ],
     "host_permissions": [
+      "https://api.puter.com/*",
+      "https://puter.com/*",
       "https://twitter.com/*",
       "https://x.com/*"
     ]
   },
   "scripts": {
+    "postinstall": "node scripts/patch-puter.mjs",
     "dev": "plasmo dev",
     "build": "plasmo build",
     "package": "plasmo package"
   },
   "dependencies": {
+    "@heyputer/puter.js": "^2.2.14",
     "@plasmohq/storage": "^1.10.0",
     "plasmo": "^0.90.4",
     "react": "^18.3.1",

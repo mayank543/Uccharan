@@ -11,8 +11,10 @@ import {
   savePendingPost,
 } from "~/lib/storage";
 import {
+  connectPuter,
   createSpeechController,
   isSpeechRecognitionSupported,
+  restorePuterSession,
 } from "~/lib/speech";
 import { buildTwitterIntentUrl } from "~/lib/twitter";
 
@@ -20,10 +22,13 @@ const RecorderPage = () => {
   const [transcript, setTranscript] = useState("");
   const [interimText, setInterimText] = useState("");
   const [isListening, setIsListening] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState("");
   const [isSupported, setIsSupported] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
   const [autoModeEnabled, setAutoModeEnabled] = useState(true);
+  const [isPuterConnected, setIsPuterConnected] = useState(false);
   const speechControllerRef =
     useRef<ReturnType<typeof createSpeechController>>(null);
   const transcriptRef = useRef("");
@@ -81,7 +86,7 @@ const RecorderPage = () => {
 
   const startListening = () => {
     if (!speechControllerRef.current) {
-      setError("Speech recognition is unavailable right now.");
+      setError("Speech transcription is unavailable right now.");
       return;
     }
 
@@ -91,67 +96,66 @@ const RecorderPage = () => {
     setInterimText("");
     speechControllerRef.current?.reset();
     void clearDraft();
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setError("Microphone access is unavailable in this browser context.");
-      return;
-    }
-
-    void navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
-        stream.getTracks().forEach((track) => track.stop());
-        speechControllerRef.current?.start();
-      })
-      .catch(() => {
-        setError(
-          "Microphone access was denied. Allow mic access for this extension in Chrome settings.",
-        );
-      });
+    void speechControllerRef.current.start();
   };
 
   useEffect(() => {
-    void loadAutoModeEnabled().then((enabled) => {
-      setAutoModeEnabled(enabled);
-    });
-
     document.documentElement.style.background = "#eef4f8";
     document.body.style.background = "#eef4f8";
     document.body.style.minWidth = "620px";
     document.body.style.margin = "0";
 
-    const supported = isSpeechRecognitionSupported();
-    setIsSupported(supported);
+    const initialize = async () => {
+      const [enabled, puterSession] = await Promise.all([
+        loadAutoModeEnabled(),
+        restorePuterSession(),
+      ]);
+      setAutoModeEnabled(enabled);
+      setIsPuterConnected(Boolean(puterSession));
 
-    if (!supported) {
-      setError(
-        "Web Speech API is unavailable in this browser. Use Chrome for the best result.",
-      );
-      return;
-    }
+      const supported = isSpeechRecognitionSupported();
+      setIsSupported(supported);
 
-    speechControllerRef.current = createSpeechController({
-      onStart: () => {
-        setError("");
-        setIsListening(true);
-      },
-      onResult: ({ finalText, interimText: interim }) => {
-        setTranscript(finalText);
-        setInterimText(interim);
-      },
-      onEnd: () => {
-        setIsListening(false);
-        setInterimText("");
-        void postToX(`${transcriptRef.current}`.trim());
-      },
-      onError: (message) => {
-        setError(message);
-        setIsListening(false);
-      },
-      getSeedText: () => "",
-    });
+      if (!supported) {
+        setError(
+          "Audio recording is unavailable in this browser context.",
+        );
+        return;
+      }
 
-    startListening();
+      speechControllerRef.current = createSpeechController({
+        onStart: () => {
+          setError("");
+          setIsListening(true);
+          setIsTranscribing(false);
+        },
+        onResult: ({ finalText, interimText: interim }) => {
+          transcriptRef.current = finalText;
+          setTranscript(finalText);
+          setInterimText(interim);
+        },
+        onEnd: () => {
+          setIsListening(false);
+          setIsTranscribing(false);
+          setInterimText("");
+          void postToX(`${transcriptRef.current}`.trim());
+        },
+        onError: (message) => {
+          setError(message);
+          setIsListening(false);
+          setIsTranscribing(false);
+        },
+        getSeedText: () => "",
+      });
+
+      if (puterSession) {
+        startListening();
+      } else {
+        setError("Connect Puter once before using auto mode.");
+      }
+    };
+
+    void initialize();
 
     return () => {
       speechControllerRef.current?.abort();
@@ -163,6 +167,7 @@ const RecorderPage = () => {
   }, [transcript]);
 
   const handleStop = () => {
+    setIsTranscribing(true);
     speechControllerRef.current?.stop();
   };
 
@@ -184,6 +189,25 @@ const RecorderPage = () => {
     });
   };
 
+  const handleConnectPuter = async () => {
+    setIsConnecting(true);
+    setError("");
+
+    try {
+      await connectPuter();
+      setIsPuterConnected(true);
+      startListening();
+    } catch (connectionError) {
+      setError(
+        connectionError instanceof Error
+          ? connectionError.message
+          : "Failed to connect Puter.",
+      );
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
   return (
     <main className="w-[620px] bg-[#eef4f8] p-3 text-ink">
       <section className="rounded-[24px] border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur">
@@ -199,6 +223,8 @@ const RecorderPage = () => {
             <span className="text-sm text-slate-500">
               {isListening
                 ? "Listening..."
+                : isTranscribing
+                  ? "Transcribing..."
                 : isPosting
                   ? "Posting..."
                   : "Ready"}
@@ -206,10 +232,19 @@ const RecorderPage = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            {!isPuterConnected ? (
+              <button
+                className="flex h-9 items-center justify-center rounded-full bg-brand px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isConnecting}
+                onClick={() => void handleConnectPuter()}
+              >
+                {isConnecting ? "Connecting..." : "Connect Puter"}
+              </button>
+            ) : null}
             <button
               aria-label="Stop listening and post"
               className="flex h-9 items-center justify-center gap-1 rounded-full bg-accent px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!isSupported || !isListening || isPosting}
+              disabled={!isSupported || !isListening || isPosting || isTranscribing || !isPuterConnected}
               onClick={handleStop}
             >
               <svg

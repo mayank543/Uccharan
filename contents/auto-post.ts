@@ -1,4 +1,4 @@
-import type { PlasmoCSConfig } from "plasmo"
+import type { PlasmoCSConfig } from "plasmo/dist/type"
 
 import { clearDraft, clearPendingPost, loadPendingPost } from "~/lib/storage"
 
